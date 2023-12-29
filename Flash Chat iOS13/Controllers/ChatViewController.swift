@@ -8,11 +8,14 @@
 
 import UIKit
 import FirebaseAuth
+import FirebaseFirestore
 
 class ChatViewController: UIViewController {
 
     @IBOutlet weak var tableView: UITableView!
     @IBOutlet weak var messageTextfield: UITextField!
+    
+    let db = Firestore.firestore()
     
     var messages: [Message] = [Message(sender: "1@2.com", body: "Hi"), Message(sender: "a@b.com", body: "hello"), Message(sender: "1@2.com", body: "hihi")]
     
@@ -26,7 +29,18 @@ class ChatViewController: UIViewController {
     }
     
     @IBAction func sendPressed(_ sender: UIButton) {
-        
+        if let messageBody = messageTextfield.text, let messageSender = Auth.auth().currentUser?.email {
+            db.collection(K.FStore.collectionName).addDocument(data: [K.FStore.senderField: messageSender,
+                                                                      K.FStore.bodyField: messageBody]) {
+                (error) in
+                if let e = error {
+                    print("Error with saving data to Firestore")
+                }
+                else {
+                    print("gucci gang")
+                }
+            }
+        }
     }
     
     @IBAction func logOutPressed(_ sender: UIBarButtonItem) {
@@ -47,7 +61,7 @@ extension ChatViewController: UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell { //Gets called for as many cells there are
-        let cell = tableView.dequeueReusableCell(withIdentifier: K.cellIdentifier, for: indexPath) as! MessageCell
+        let cell = tableView.dequeueReusableCell(withIdentifier: K.cellIdentifier, for: indexPath) as! MessageCell //Downcasting - tableView.dequeueReusableCell returns a superclass of MessageCell
         cell.label.text = messages[indexPath.row].body
         return cell
     }
