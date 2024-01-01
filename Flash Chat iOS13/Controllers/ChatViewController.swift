@@ -24,19 +24,49 @@ class ChatViewController: UIViewController {
         tableView.dataSource = self
         title = K.appName
         navigationItem.hidesBackButton = true
-        
         tableView.register(UINib(nibName: K.cellNibName, bundle: nil), forCellReuseIdentifier: K.cellIdentifier)
+        loadMessages()
+    }
+    
+    func loadMessages() {
+        db.collection(K.FStore.collectionName).order(by: K.FStore.dateField).addSnapshotListener { (querySnapshot, error) in
+            self.messages = []
+            if let e = error {
+                print ("Error: ", e.localizedDescription)
+            }
+            else {
+                if let snapshotDocuments = querySnapshot?.documents {
+                    for doc in snapshotDocuments {
+                        let data = doc.data()
+                        if let sender = data[K.FStore.senderField] as? String, let message = data[K.FStore.bodyField] as? String {
+                            let newMessage = Message(sender: sender, body: message)
+                            self.messages.append(newMessage)
+                            DispatchQueue.main.async {
+                                self.tableView.reloadData()
+                                let indexPath = IndexPath(row: self.messages.count - 1, section: 0)
+                                self.tableView.scrollToRow(at: indexPath, at: .top, animated: true)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     @IBAction func sendPressed(_ sender: UIButton) {
         if let messageBody = messageTextfield.text, let messageSender = Auth.auth().currentUser?.email {
-            db.collection(K.FStore.collectionName).addDocument(data: [K.FStore.senderField: messageSender,
-                                                                      K.FStore.bodyField: messageBody]) {
+            db.collection(K.FStore.collectionName).addDocument(data: [
+                K.FStore.senderField: messageSender,
+                K.FStore.bodyField: messageBody,
+                K.FStore.dateField: Date().timeIntervalSince1970]) {
                 (error) in
                 if let e = error {
-                    print("Error with saving data to Firestore")
+                    print ("Error: ", e.localizedDescription)
                 }
                 else {
+                    DispatchQueue.main.async {
+                        self.messageTextfield.text = ""
+                    }
                     print("gucci gang")
                 }
             }
@@ -61,8 +91,18 @@ extension ChatViewController: UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell { //Gets called for as many cells there are
-        let cell = tableView.dequeueReusableCell(withIdentifier: K.cellIdentifier, for: indexPath) as! MessageCell //Downcasting - tableView.dequeueReusableCell returns a superclass of MessageCell
-        cell.label.text = messages[indexPath.row].body
+        let message = messages[indexPath.row]
+        var cell = tableView.dequeueReusableCell(withIdentifier: K.cellIdentifier, for: indexPath) as! MessageCell //Downcasting - tableView.dequeueReusableCell returns a superclass of MessageCell
+        cell.leftImageView.isHidden = false
+        cell.rightImageView.isHidden = true
+        cell.messageBubble.backgroundColor = UIColor(named: K.BrandColors.purple)
+        if message.sender == Auth.auth().currentUser?.email {
+            cell = tableView.dequeueReusableCell(withIdentifier: K.cellIdentifier, for: indexPath) as! MessageCell
+            cell.leftImageView.isHidden = true
+            cell.rightImageView.isHidden = false
+            cell.messageBubble.backgroundColor = UIColor(named: K.BrandColors.lightPurple)
+        }
+        cell.label.text = message.body
         return cell
     }
 }
